@@ -1,0 +1,31 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{db}/documents {
+    function signedIn() { return request.auth != null; }
+    function verified() {
+      return signedIn() &&
+        get(/databases/$(db)/documents/users/$(request.auth.uid)).data.verified == true;
+    }
+    function isAdmin() {
+      return signedIn() && exists(/databases/$(db)/documents/admins/$(request.auth.uid));
+    }
+
+    match /users/{uid} {
+      allow read: if signedIn() && request.auth.uid == uid;
+      allow write: if false; // يكتب فيها الخادم فقط
+    }
+    match /admins/{uid} {
+      allow read: if signedIn() && request.auth.uid == uid;
+    }
+    match /books/{id} {
+      allow read: if verified() &&
+        (resource.data.status == 'approved' || isAdmin() || resource.data.uploaderId == request.auth.uid);
+      allow create: if verified() &&
+        request.resource.data.status == 'pending' &&
+        request.resource.data.uploaderId == request.auth.uid &&
+        request.resource.data.title is string && request.resource.data.title.size() < 150 &&
+        request.resource.data.keys().hasOnly(['title','author','subject','grade','country','url','status','uploaderId','createdAt']);
+      allow update, delete: if isAdmin();
+    }
+  }
+}
