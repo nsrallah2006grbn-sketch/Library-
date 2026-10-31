@@ -1,41 +1,55 @@
-name: Build Flutter APK
+workflow = r'''
+# .github/workflows/build_apk.yml
+# ابنِ ملف APK تلقائياً عند كل دفع إلى main
+
+name: Build APK
 
 on:
   push:
-    branches: [ "main", "master" ]
+    branches: [main, master]
+  workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Java
+      - name: Setup Java
         uses: actions/setup-java@v4
         with:
-          distribution: 'zulu'
+          distribution: 'temurin'
           java-version: '17'
 
-      - name: Install Flutter manually
-        run: |
-          git clone https://github.com/flutter/flutter.git --depth 1 -b stable _flutter
-          echo "$PWD/_flutter/bin" >> $GITHUB_PATH
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
 
-      - name: Find and Build APK
-        run: |
-          # العثور على المجلد الذي يحتوي على ملف pubspec.yaml والانتقال إليه
-          PUBSPEC_PATH=$(find . -name "pubspec.yaml" -not -path '*/.*' -print -quit)
-          PROJECT_DIR=$(dirname "$PUBSPEC_PATH")
-          echo "Found project at: $PROJECT_DIR"
-          cd "$PROJECT_DIR"
-          
-          flutter pub get
-          flutter build apk --release
+      # الحل الجوهري: توليد ملفات المنصة المفقودة تلقائياً قبل البناء
+      - name: Generate Android platform files (if missing)
+        run: flutter create . --platforms android --org com.maskani --project-name maskani_pro
 
-      - name: Upload APK Artifact
+      - name: Fix minSdk for Firebase
+        run: |
+          sed -i 's/minSdkVersion flutter.minSdkVersion/minSdkVersion 23/' android/app/build.gradle
+          sed -i "s/minSdk = flutter.minSdkVersion/minSdk = 23/" android/app/build.gradle.kts 2>/dev/null || true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Build APK (release)
+        run: flutter build apk --release
+
+      - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: app-release
-          path: '**/build/app/outputs/flutter-apk/app-release.apk'
+          name: maskani-app
+          path: build/app/outputs/flutter-apk/app-release.apk
+'''
+import os
+os.makedirs('/mnt/agents/output/maskani_pro/.github/workflows', exist_ok=True)
+open('/mnt/agents/output/maskani_pro/build_apk.yml', 'w', encoding='utf-8').write(workflow.strip())
+print('ok')
