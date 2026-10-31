@@ -23,14 +23,12 @@ jobs:
           git clone https://github.com/flutter/flutter.git --depth 1 -b stable _flutter
           echo "$PWD/_flutter/bin" >> $GITHUB_PATH
 
-      - name: Check Flutter Version
-        run: flutter --version
-
-      - name: Find project and build APK
+      - name: Find and Build APK
         run: |
-          # البحث تلقائياً عن مكان ملف pubspec.yaml والتحويل إليه
-          PROJECT_DIR=$(dirname $(find . -name "pubspec.yaml" -print -quit))
-          echo "Project found in: $PROJECT_DIR"
+          # العثور على المجلد الذي يحتوي على ملف pubspec.yaml والانتقال إليه
+          PUBSPEC_PATH=$(find . -name "pubspec.yaml" -not -path '*/.*' -print -quit)
+          PROJECT_DIR=$(dirname "$PUBSPEC_PATH")
+          echo "Found project at: $PROJECT_DIR"
           cd "$PROJECT_DIR"
           
           flutter pub get
